@@ -1,13 +1,14 @@
 import java.util.*;
 
 public class DFS {
+  static Scanner scanner = new Scanner(System.in);
+
   static class Vertice {
     int visitado;
     List<Integer> listaDeAdjacencia = new ArrayList<>();
   }
 
   public static void main(String[] args) {
-    Scanner scanner = new Scanner(System.in);
 
     System.out.println("Digite a quantidade de cenários a serem analisados: ");
     int qtdCenarios = scanner.nextInt();

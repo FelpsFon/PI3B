@@ -55,8 +55,9 @@ class Vertice {
 }
 
 public class BFS {
+  static Scanner scanner = new Scanner(System.in);
+
   public static void main(String[] args) {
-    Scanner scanner = new Scanner(System.in);
     int numVertices = scanner.nextInt();
     int numArestas = scanner.nextInt();
 
