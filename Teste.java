@@ -73,16 +73,16 @@ public class Teste {
         }
     }
 
-    class Vertice {
-        private int id;
-        private List<Integer> adjacencia;
-        private boolean visitado;
+    public static class Vertice {
+        private final int id;
+        private final List<Integer> adjacencia;
+        private boolean isFinal; // Adiciona um campo para verificar se o vértice é o final
 
         // Construtor
-        public Vertice(int id, List<Integer> adjacencia, boolean visitado) {
+        public Vertice(int id, List<Integer> adjacencia, boolean isFinal) {
             this.id = id;
             this.adjacencia = adjacencia;
-            this.visitado = visitado;
+            this.isFinal = isFinal;
         }
 
         // Getters
@@ -94,86 +94,104 @@ public class Teste {
             return this.adjacencia;
         }
 
-        public boolean isVisitado() {
-            return this.visitado;
+        public boolean isFinal() {
+            return this.isFinal;
         }
 
         // Setters
-        public void setId(int id) {
-            this.id = id;
+
+        public void setFinal(boolean isFinal) {
+            this.isFinal = isFinal;
         }
 
-        public void setAdjacencia(List<Integer> adjacencia) {
-            this.adjacencia = adjacencia;
-        }
-
-        public void setVisitado(boolean visitado) {
-            this.visitado = visitado;
-        }
     }
 
-    Queue<Integer> fila = new LinkedList<>();
-    Map<Integer, Vertice> mapaVertices = new HashMap<>();
+    class BFS {
+        public List<Integer> buscar(HashMap<Integer, Vertice> mapa, int inicio) {
+            HashMap<Integer, Integer> visitados = new HashMap<>();
+            Queue<Integer> fila = new LinkedList<>();
+            fila.add(inicio);
+            visitados.put(inicio, null);
+            int fim = -1;
 
-    public void explorarLabirinto(String labirinto) {
-        String resposta = mazeIniciar(labirinto);
-        JSONObject jsonResposta = new JSONObject(resposta);
-
-        int posAtual = jsonResposta.getInt("pos_atual");
-        JSONArray movimentos = jsonResposta.getJSONArray("movimentos");
-
-        // Converte a lista de movimentos para List<Integer>
-        List<Integer> movimentosAsIntegers = new ArrayList<>();
-        for (Object obj : movimentos.toList()) {
-            movimentosAsIntegers.add((Integer) obj);
-        }
-
-        Vertice verticeAtual = new Vertice(posAtual, movimentosAsIntegers, false);
-        mapaVertices.put(posAtual, verticeAtual);
-
-        fila.add(posAtual);
-        fila.addAll(movimentosAsIntegers);
-
-        while (!fila.isEmpty()) {
-            fila.poll();
-            verticeAtual.setVisitado(true);
-
-            for (Integer idAdjacente : verticeAtual.getAdjacencia()) {
-                if (!mapaVertices.containsKey(idAdjacente)) {
-                    // Adicione o vértice ao mapa antes de enfileirar sua lista de adjacência
-
-                    String respostaMov = mazeMovimentar(labirinto, idAdjacente);
-                    assert respostaMov != null;
-                    JSONObject jsonRespostaMov = new JSONObject(respostaMov);
-
-                    int posAtualMov = jsonRespostaMov.getInt("pos_atual");
-                    JSONArray movimentosMov = jsonRespostaMov.getJSONArray("movimentos");
-
-                    if (jsonResposta.getBoolean("final")) {
-                        System.out.println("Chegamos ao final do labirinto no vértice " + posAtualMov);
-                        return;
-                    }
-
-                    // Converte a lista de movimentos para List<Integer>
-                    List<Integer> movimentosAsIntegersMov = new ArrayList<>();
-                    for (Object obj : movimentosMov.toList()) {
-                        movimentosAsIntegersMov.add((Integer) obj);
-                    }
-
-                    Vertice adjacente = new Vertice(idAdjacente, movimentosAsIntegersMov, true);
-                    mapaVertices.put(idAdjacente, adjacente);
-                    fila.addAll(movimentosAsIntegersMov);
-                    fila.poll();
-                }else{
-                    fila.remove(idAdjacente);
+            while (!fila.isEmpty()) {
+                int atual = fila.remove();
+                Vertice vertice = mapa.get(atual);
+                if (vertice.isFinal()) {
+                    fim = atual;
+                    break;
                 }
-
+                for (int adjacente : vertice.getAdjacencia()) {
+                    if (!visitados.containsKey(adjacente)) {
+                        fila.add(adjacente);
+                        visitados.put(adjacente, atual);
+                    }
+                }
             }
+
+            if (fim == -1) {
+                return null;  // Não encontrou um caminho para o final
+            }
+
+            List<Integer> caminho = new LinkedList<>();
+            Integer atual = fim;
+            while (atual != null) {
+                caminho.add(0, atual);
+                atual = visitados.get(atual);
+            }
+
+            return caminho;
         }
     }
 
     public static void main(String[] args) {
         Teste teste = new Teste();
-        teste.explorarLabirinto("maze-sample");
+        String maze = "mediu-maze";
+        String response = teste.mazeIniciar(maze);
+        JSONObject json = new JSONObject(response);
+        int inicio = json.getInt("pos_atual");
+        int profundidadeMax = Integer.MAX_VALUE;
+        HashMap<Integer, Vertice> mapa = new HashMap<>();
+        Stack<Integer> pilha = new Stack<>();
+        pilha.push(inicio);
+        int profundidade = 0;
+
+        while (!pilha.isEmpty() && profundidade < profundidadeMax) {
+            int atual = pilha.peek();  // Olhe o topo da pilha, mas não remova o elemento
+            if (atual != inicio) {
+                response = teste.mazeMovimentar(maze, atual);
+                json = new JSONObject(response);
+            }
+            List<Integer> movimentos = new ArrayList<>();
+            JSONArray jsonArray = json.getJSONArray("movimentos");
+            for (int i = 0; i < jsonArray.length(); i++) {
+                movimentos.add(jsonArray.getInt(i));
+            }
+            boolean isFinal = json.getBoolean("final");
+            Vertice vertice = new Vertice(atual, movimentos, isFinal);
+            mapa.put(atual, vertice);
+            if (isFinal) {
+                profundidadeMax = profundidade;
+            } else {
+                boolean allVisited = true;
+                for (int adjacente : movimentos) {
+                    if (!mapa.containsKey(adjacente)) {
+                        pilha.push(adjacente);
+                        profundidade++;
+                        allVisited = false;
+                        break;
+                    }
+                }
+                if (allVisited) {
+                    pilha.pop();
+                    profundidade--;
+                }
+            }
+            System.out.println(pilha);
+        }
+
+        BFS bfs = teste.new BFS();
+        List<Integer> caminho = bfs.buscar(mapa, inicio);
+        System.out.println("Caminho mais curto: " + caminho);
     }
 }
