@@ -9,51 +9,49 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Queue;
 import java.util.Scanner;
+import java.util.Stack;
 
 public class Main {
-  Scanner scan = new Scanner(System.in);
-  Queue<Integer> fila = new LinkedList<>();
-  Map<Integer, Vertice> mapaVertices = new HashMap<>();
 
-  class Vertice {
-    private int id;
-    private List<Integer> adjacencia;
-    private boolean visitado;
+  public record Vertice(int id, List<Integer> adjacencia, boolean isFinal) {}
 
-    // Construtor
-    public Vertice(int id, List<Integer> adjacencia, boolean visitado) {
-      this.id = id;
-      this.adjacencia = adjacencia;
-      this.visitado = visitado;
-    }
+  class BFS {
+    public List<Integer> buscar(HashMap<Integer, Vertice> mapa, int inicio) {
+      HashMap<Integer, Integer> visitados = new HashMap<>();
+      Queue<Integer> fila = new LinkedList<>();
+      fila.add(inicio);
+      visitados.put(inicio, null);
+      int fim = -1;
 
-    // Getters
-    public int getId() {
-      return this.id;
-    }
+      while (!fila.isEmpty()) {
+        int atual = fila.remove();
+        Vertice vertice = mapa.get(atual);
+        if (vertice.isFinal()) {
+          fim = atual;
+          break;
+        }
+        for (int adjacente : vertice.adjacencia()) {
+          if (!visitados.containsKey(adjacente)) {
+            fila.add(adjacente);
+            visitados.put(adjacente, atual);
+          }
+        }
+      }
 
-    public List<Integer> getAdjacencia() {
-      return this.adjacencia;
-    }
+      if (fim == -1) {
+        return null; // Não encontrou um caminho para o final
+      }
 
-    public boolean isVisitado() {
-      return this.visitado;
-    }
+      List<Integer> caminho = new LinkedList<>();
+      Integer atual = fim;
+      while (atual != null) {
+        caminho.add(0, atual);
+        atual = visitados.get(atual);
+      }
 
-    // Setters
-    public void setId(int id) {
-      this.id = id;
-    }
-
-    public void setAdjacencia(List<Integer> adjacencia) {
-      this.adjacencia = adjacencia;
-    }
-
-    public void setVisitado(boolean visitado) {
-      this.visitado = visitado;
+      return caminho;
     }
   }
 
@@ -181,7 +179,39 @@ public class Main {
     }
   }
 
-  public void iniciarPrograma() {
+  public String mazeValidarCaminho(String maze, String id, List<Integer> caminho) {
+    // URL da API local
+    String url = "http://gtm.localhost/validar_caminho";
+
+    // Corpo da solicitação em formato JSON
+    String requestBody = String.format("{\"id\": \"%s\", \"labirinto\": \"%s\", \"todos_movimentos\": %s}", id, maze, caminho);
+
+    // Cria um cliente HTTP
+    HttpClient client = HttpClient.newHttpClient();
+
+    // Cria uma solicitação POST
+    HttpRequest request = HttpRequest.newBuilder()
+        .uri(URI.create(url))
+        .header("Content-Type", "application/json")
+        .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+        .build();
+
+    try {
+      // Envia a solicitação e obtém a resposta
+      HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+      // Imprime o corpo da resposta
+      String responseBody = response.body();
+      System.out.println("Corpo da Resposta: " + responseBody);
+
+      return responseBody;
+    } catch (IOException | InterruptedException e) {
+      e.printStackTrace();
+      return "\n!!Erro!!\n";
+    }
+  }
+
+  public void iniciarPrograma(Scanner scan) {
     try {
       // Limpa o console
       System.out.print("\033\143");
@@ -241,63 +271,107 @@ public class Main {
   }
 
   public void explorarLabirinto(String maze, String userID) {
-    String resposta = mazeIniciar(maze, userID);
-    JSONObject jsonResposta = new JSONObject(resposta);
+    // Comparando número de chamadas de API
+    int chamadas = 0;
 
-    int posAtual = jsonResposta.getInt("pos_atual");
-    JSONArray movimentos = jsonResposta.getJSONArray("movimentos");
+    // Chamada inicial
+    String response = mazeIniciar(maze, userID);
+    chamadas++;
+    JSONObject json = new JSONObject(response);
 
-    // Converte a lista de movimentos para List<Integer>
-    List<Integer> movimentosAsIntegers = new ArrayList<>();
-    for (Object obj : movimentos.toList()) {
-      movimentosAsIntegers.add((Integer) obj);
+    // Criação das estruturas de controle
+    HashMap<Integer, Vertice> mapa = new HashMap<>();
+    HashMap<Integer, Integer> profundidade = new HashMap<>();
+    Stack<Integer> pilha = new Stack<>();
+
+    // Registro do inicio do labirinto no HashMap
+    int inicio = json.getInt("pos_atual");
+    List<Integer> movimentos = new ArrayList<>();
+    JSONArray jsonArray = json.getJSONArray("movimentos");
+    for (int i = 0; i < jsonArray.length(); i++) {
+      movimentos.add(jsonArray.getInt(i));
     }
+    boolean isFinal = json.getBoolean("final");
+    Vertice vertice = new Vertice(inicio, movimentos, isFinal);
+    mapa.put(inicio, vertice);
+    profundidade.put(inicio, 0);
 
-    Vertice verticeAtual = new Vertice(posAtual, movimentosAsIntegers, false);
-    mapaVertices.put(posAtual, verticeAtual);
+    // Adição do inicio do labirinto à pilha
+    pilha.push(inicio);
 
-    fila.add(posAtual);
-    fila.addAll(movimentosAsIntegers);
+    // Adiciona o primeiro vértice da lista de adjacência à pilha
+    int proximo = movimentos.get(0);
+    pilha.push(proximo);
+    profundidade.put(proximo, 1);
 
-    while (!fila.isEmpty()) {
-      fila.poll();
-      verticeAtual.setVisitado(true);
+    // Variável para rastrear a profundidade máxima
+    int profundidadeMaxima = Integer.MAX_VALUE;
 
-      for (Integer idAdjacente : verticeAtual.getAdjacencia()) {
-        if (!mapaVertices.containsKey(idAdjacente)) {
-          // Adicione o vértice ao mapa antes de enfileirar sua lista de adjacência
+    // Tempo do DFS
+    long inicioDFS = System.currentTimeMillis();
+    // Loop While para o DFS
+    while (!pilha.isEmpty()) {
 
-          String respostaMov = mazeMovimentar(maze, userID, idAdjacente);
-          assert respostaMov != null;
-          JSONObject jsonRespostaMov = new JSONObject(respostaMov);
+      // Movimentação para o topo da pilha e adição do vértice ao HashMap
+      int atual = pilha.peek(); // Olhe o topo da pilha, mas não remova o elemento
+      response = mazeMovimentar(maze, userID, atual);
+      chamadas++;
+      JSONObject jsonAtual = new JSONObject(response);
+      List<Integer> movimentosAtual = new ArrayList<>();
+      JSONArray jsonArrayAtual = jsonAtual.getJSONArray("movimentos");
+      for (int i = 0; i < jsonArrayAtual.length(); i++) {
+        movimentosAtual.add(jsonArrayAtual.getInt(i));
+      }
+      boolean isFinalAtual = jsonAtual.getBoolean("final");
+      Vertice verticeAtual = new Vertice(atual, movimentosAtual, isFinalAtual);
+      mapa.put(atual, verticeAtual);
 
-          int posAtualMov = jsonRespostaMov.getInt("pos_atual");
-          JSONArray movimentosMov = jsonRespostaMov.getJSONArray("movimentos");
+      // Se o vértice atual é o final, atualiza a profundidadeMaxima
+      if (isFinalAtual) {
+        profundidadeMaxima = profundidade.get(atual);
+      }
 
-          if (jsonResposta.getBoolean("final")) {
-            System.out.println("Chegamos ao final do labirinto no vértice " + posAtualMov);
-            return;
-          }
-
-          // Converte a lista de movimentos para List<Integer>
-          List<Integer> movimentosAsIntegersMov = new ArrayList<>();
-          for (Object obj : movimentosMov.toList()) {
-            movimentosAsIntegersMov.add((Integer) obj);
-          }
-
-          Vertice adjacente = new Vertice(idAdjacente, movimentosAsIntegersMov, true);
-          mapaVertices.put(idAdjacente, adjacente);
-          fila.addAll(movimentosAsIntegersMov);
-          fila.poll();
-        } else {
-          fila.remove(idAdjacente);
+      // Implementação para conferir se a lista de adjacência do vértice atual está
+      // totalmente visitada
+      boolean allVisited = true;
+      for (int adjacente : movimentosAtual) {
+        if (!mapa.containsKey(adjacente) && profundidade.get(atual) + 1 <= profundidadeMaxima) {
+          pilha.push(adjacente);
+          profundidade.put(adjacente, profundidade.get(atual) + 1);
+          allVisited = false;
+          break;
         }
       }
+      if (allVisited) {
+        pilha.pop();
+      }
+      System.out.println(pilha);
     }
+
+    long fimDFS = System.currentTimeMillis();
+
+    System.out.println(mapa);
+
+    double tempoDFS = (fimDFS - inicioDFS);
+
+    System.out.println("Tempo decorrido no DFS: " + tempoDFS + " milissegundos ou " + tempoDFS / 1000.0 + "segundos");
+
+    BFS bfs = new BFS();
+    long inicioBFS = System.currentTimeMillis();
+    List<Integer> caminho = bfs.buscar(mapa, inicio);
+    long fimBFS = System.currentTimeMillis();
+    double tempoBFS = (fimBFS - inicioBFS);
+
+    System.out.println("Tempo decorrido no BFS: " + tempoBFS + " milissegundos ou " + tempoBFS / 1000.0 + "segundos");
+    System.out.println("Caminho mais curto: " + caminho);
+    System.out.println("Numero de chamadas da API: " + chamadas);
+    mazeValidarCaminho(maze, userID, caminho);
   }
 
   public static void main(String[] args) {
     Main main = new Main();
-    main.iniciarPrograma();
+    Scanner scan = new Scanner(System.in);
+
+    main.iniciarPrograma(scan);
   }
 }
