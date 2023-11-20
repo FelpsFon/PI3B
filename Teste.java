@@ -122,7 +122,7 @@ public class Teste {
         int chamadas = 0;
 
         // Chamada inicial
-        String maze = "mediu-maze";
+        String maze = "very-large-maze";
         String response = mazeIniciar(maze);
         chamadas++;
         JSONObject json = new JSONObject(response);
@@ -158,6 +158,7 @@ public class Teste {
         // Tempo do DFS
         long inicioDFS = System.currentTimeMillis();
         // Loop While para o DFS
+        outerloop:
         while (!pilha.isEmpty()) {
 
             // Movimentação para o topo da pilha e adição do vértice ao HashMap
@@ -165,6 +166,10 @@ public class Teste {
             response = mazeMovimentar(maze, atual);
             chamadas++;
             JSONObject jsonAtual = new JSONObject(response);
+            // Verificar se a resposta contém a mensagem de erro
+            if (jsonAtual.has("detail") && jsonAtual.getString("detail").equals("ID não encontrado para o labirinto em questão ou está expirado!")) {
+                break outerloop;  // Sai do loop while
+            }
             List<Integer> movimentosAtual = new ArrayList<>();
             JSONArray jsonArrayAtual = jsonAtual.getJSONArray("movimentos");
             for (int i = 0; i < jsonArrayAtual.length(); i++) {
@@ -192,7 +197,7 @@ public class Teste {
             if (allVisited) {
                 pilha.pop();
             }
-            System.out.println(pilha);
+//            System.out.println(pilha);
         }
 
         long fimDFS = System.currentTimeMillis();
@@ -201,7 +206,7 @@ public class Teste {
 
         System.out.println("Tempo decorrido no DFS: " + tempoDFS + " milissegundos ou " + tempoDFS/1000.0 + "segundos");
 
-        System.out.println(mapa);
+//        System.out.println(mapa);
 
         BFS bfs = new BFS();
         long inicioBFS = System.currentTimeMillis();
