@@ -1,3 +1,5 @@
+package algoritmos;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -6,18 +8,19 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.IOException;
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-public class Teste {
+public class DfsLimite {
 
+    private static final HttpClient client = HttpClient.newHttpClient();
+    private static final Logger LOGGER = Logger.getLogger(DfsLimite.class.getName());
     public static String mazeIniciar(String maze) {
         // URL da API local
         String url = "http://gtm.localhost/iniciar";
 
         // Corpo da solicitação em formato JSON
         String requestBody = String.format("{\"id\": \"usuario\", \"labirinto\": \"%s\"}", maze);
-
-        // Cria um cliente HTTP
-        HttpClient client = HttpClient.newHttpClient();
 
         // Cria uma solicitação POST
         HttpRequest request = HttpRequest.newBuilder()
@@ -30,13 +33,9 @@ public class Teste {
             // Envia a solicitação e obtém a resposta
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-            // Imprime o corpo da resposta
-            String responseBody = response.body();
-            System.out.println("Corpo da Resposta: " + responseBody);
-
-            return responseBody;
+            return response.body();
         } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
+            LOGGER.log(Level.SEVERE, "An exception occurred", e);
             return null;
         }
     }
@@ -48,9 +47,6 @@ public class Teste {
         // Corpo da solicitação em formato JSON
         String requestBody = String.format("{\"id\": \"usuario\", \"labirinto\": \"%s\", \"nova_posicao\": %d}", maze, novaPosicao);
 
-        // Cria um cliente HTTP
-        HttpClient client = HttpClient.newHttpClient();
-
         // Cria uma solicitação POST
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -62,13 +58,9 @@ public class Teste {
             // Envia a solicitação e obtém a resposta
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-            // Imprime o corpo da resposta
-            String responseBody = response.body();
-            System.out.println("Corpo da Resposta: " + responseBody);
-
-            return responseBody;
+            return response.body();
         } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
+            LOGGER.log(Level.SEVERE, "An exception occurred", e);
             return null;
         }
     }
@@ -115,15 +107,16 @@ public class Teste {
         }
     }
 
-
     public static void main(String[] args) {
 
         // Comparando número de chamadas de API
         int chamadas = 0;
 
         // Chamada inicial
-        String maze = "very-large-maze";
+        String maze = "maze-sample2";
         String response = mazeIniciar(maze);
+        // Tempo do DFS
+        long inicioDFS = System.currentTimeMillis();
         chamadas++;
         JSONObject json = new JSONObject(response);
 
@@ -155,9 +148,7 @@ public class Teste {
         // Variável para rastrear a profundidade máxima
         int profundidadeMaxima = Integer.MAX_VALUE;
 
-        // Tempo do Dfs
-        long inicioDFS = System.currentTimeMillis();
-        // Loop While para o Dfs
+        // Loop While para o DFS
         outerloop:
         while (!pilha.isEmpty()) {
 
@@ -197,25 +188,24 @@ public class Teste {
             if (allVisited) {
                 pilha.pop();
             }
-//            System.out.println(pilha);
         }
 
         long fimDFS = System.currentTimeMillis();
 
         double tempoDFS = (fimDFS - inicioDFS);
 
-        System.out.println("Tempo decorrido no Dfs: " + tempoDFS + " milissegundos ou " + tempoDFS/1000.0 + "segundos");
-
-//        System.out.println(mapa);
+        System.out.println("Tempo decorrido no DFS: " + tempoDFS + " milissegundos ou " + tempoDFS/1000.0 + "segundos");
 
         BFS bfs = new BFS();
         long inicioBFS = System.currentTimeMillis();
         List<Integer> caminho = bfs.buscar(mapa, inicio);
         long fimBFS = System.currentTimeMillis();
         double tempoBFS = (fimBFS - inicioBFS);
+        int nVertices = caminho.size();
 
         System.out.println("Tempo decorrido no BFS: " + tempoBFS + " milissegundos ou " + tempoBFS/1000.0 + "segundos");
         System.out.println("Caminho mais curto: " + caminho);
         System.out.println("Numero de chamadas da API: " + chamadas);
+        System.out.println("Numero de elementos no caminho mais curto: " + nVertices);
     }
 }

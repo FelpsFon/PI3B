@@ -1,3 +1,5 @@
+package algoritmos;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -7,7 +9,7 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.util.*;
 
-public class Teste {
+public class SeguidorDeParedeDireita {
 
     public static String mazeIniciar(String maze) {
         // URL da API local
@@ -73,64 +75,22 @@ public class Teste {
         }
     }
 
-    public record Vertice(int id, List<Integer> adjacencia, boolean isFinal) {}
-
-    public static class BFS {
-        public List<Integer> buscar(HashMap<Integer, Vertice> mapa, int inicio) {
-            HashMap<Integer, Integer> visitados = new HashMap<>();
-            Queue<Integer> fila = new LinkedList<>();
-            fila.add(inicio);
-            visitados.put(inicio, null);
-            int fim = -1;
-
-            while (!fila.isEmpty()) {
-                int atual = fila.remove();
-                if (mapa.containsKey(atual)) {
-                    Vertice vertice = mapa.get(atual);
-                    if (vertice.isFinal()) {
-                        fim = atual;
-                        break;
-                    }
-                    for (int adjacente : vertice.adjacencia()) {
-                        if (!visitados.containsKey(adjacente)) {
-                            fila.add(adjacente);
-                            visitados.put(adjacente, atual);
-                        }
-                    }
-                }
-            }
-
-            if (fim == -1) {
-                return null;  // Não encontrou um caminho para o final
-            }
-
-            List<Integer> caminho = new LinkedList<>();
-            Integer atual = fim;
-            while (atual != null) {
-                caminho.add(0, atual);
-                atual = visitados.get(atual);
-            }
-
-            return caminho;
-        }
-    }
-
+    public record Vertice(int id, List<Integer> adjacencia, boolean isFinal, int pai) {}
 
     public static void main(String[] args) {
 
         // Comparando número de chamadas de API
         int chamadas = 0;
 
+        long inicioSeguidorDeParedeDireita = System.currentTimeMillis();
         // Chamada inicial
-        String maze = "very-large-maze";
+        String maze = "maze-sample";
         String response = mazeIniciar(maze);
         chamadas++;
         JSONObject json = new JSONObject(response);
 
         // Criação das estruturas de controle
-        HashMap<Integer, Vertice> mapa = new HashMap<>();
-        HashMap<Integer, Integer> profundidade = new HashMap<>();
-        Stack<Integer> pilha = new Stack<>();
+        HashMap<Integer, SeguidorDeParedeDireita.Vertice> mapa = new HashMap<>();
 
         // Registro do inicio do labirinto no HashMap
         int inicio = json.getInt("pos_atual");
@@ -140,35 +100,24 @@ public class Teste {
             movimentos.add(jsonArray.getInt(i));
         }
         boolean isFinal = json.getBoolean("final");
-        Vertice vertice = new Vertice(inicio, movimentos, isFinal);
+        SeguidorDeParedeDireita.Vertice vertice = new SeguidorDeParedeDireita.Vertice(inicio, movimentos, isFinal, -1);
         mapa.put(inicio, vertice);
-        profundidade.put(inicio, 0);
 
-        // Adição do inicio do labirinto à pilha
-        pilha.push(inicio);
+        // Movimentação
+        int atual = movimentos.get(movimentos.size() - 1);// Escolha o último movimento (maior) para a regra da mão direita
+        int pai = inicio;
 
-        // Adiciona o primeiro vértice da lista de adjacência à pilha
-        int proximo = movimentos.get(0);
-        pilha.push(proximo);
-        profundidade.put(proximo, 1);
+        // Loop While para o algoritmo Seguidor de Parede
+        while (true) {
 
-        // Variável para rastrear a profundidade máxima
-        int profundidadeMaxima = Integer.MAX_VALUE;
-
-        // Tempo do Dfs
-        long inicioDFS = System.currentTimeMillis();
-        // Loop While para o Dfs
-        outerloop:
-        while (!pilha.isEmpty()) {
-
-            // Movimentação para o topo da pilha e adição do vértice ao HashMap
-            int atual = pilha.peek();  // Olhe o topo da pilha, mas não remova o elemento
+            // Movimentação para a posição atual e adição do vértice ao HashMap
             response = mazeMovimentar(maze, atual);
             chamadas++;
+//            pais.put(atual, pai); // Armazena o pai do vértice atual
             JSONObject jsonAtual = new JSONObject(response);
             // Verificar se a resposta contém a mensagem de erro
             if (jsonAtual.has("detail") && jsonAtual.getString("detail").equals("ID não encontrado para o labirinto em questão ou está expirado!")) {
-                break outerloop;  // Sai do loop while
+                break;  // Sai do loop while
             }
             List<Integer> movimentosAtual = new ArrayList<>();
             JSONArray jsonArrayAtual = jsonAtual.getJSONArray("movimentos");
@@ -176,46 +125,59 @@ public class Teste {
                 movimentosAtual.add(jsonArrayAtual.getInt(i));
             }
             boolean isFinalAtual = jsonAtual.getBoolean("final");
-            Vertice verticeAtual = new Vertice(atual, movimentosAtual, isFinalAtual);
-            mapa.put(atual, verticeAtual);
-
-            // Se o vértice atual é o final, atualiza a profundidadeMaxima
-            if (isFinalAtual) {
-                profundidadeMaxima = profundidade.get(atual);
+            vertice = new SeguidorDeParedeDireita.Vertice(atual, movimentosAtual, isFinalAtual, pai);
+            if (!mapa.containsKey(atual)) {
+                mapa.put(atual, vertice);
             }
 
-            // Implementação para conferir se a lista de adjacência do vértice atual está totalmente visitada
-            boolean allVisited = true;
-            for (int adjacente : movimentosAtual) {
-                if (!mapa.containsKey(adjacente) && profundidade.get(atual) + 1 <= profundidadeMaxima) {
-                    pilha.push(adjacente);
-                    profundidade.put(adjacente, profundidade.get(atual) + 1);
-                    allVisited = false;
-                    break;
+            // Se o vértice atual é o final, termina o loop
+            if (isFinalAtual) {
+                // Cria uma lista para armazenar o caminho
+                List<Integer> caminho = new ArrayList<>();
+                int verticeFinal = atual;
+                int verticesCaminho = 0; // Contador para o número de vértices no caminho
+
+                // Rastreia o caminho de volta ao vértice inicial
+                while (verticeFinal != inicio) {
+                    caminho.add(0, verticeFinal);
+                    verticeFinal = mapa.get(verticeFinal).pai();
+                    verticesCaminho++;
+                }
+                // Adiciona o vértice inicial ao caminho
+                caminho.add(0, inicio);
+                verticesCaminho++;
+
+                // Imprime o caminho
+                System.out.println("Caminho para o vértice final: " + caminho);
+                System.out.println("Número de vértices no caminho: " + verticesCaminho);
+                break;
+            }
+
+            // Escolhe um adjacente à direita
+            boolean disponivel = false;
+            if (!movimentosAtual.isEmpty()) {
+                pai = atual;
+                for (int i = movimentosAtual.size() - 1; i >= 0; i--) {
+                    int adjacente = movimentosAtual.get(i);
+                    if (!mapa.containsKey(adjacente)) {
+                        atual = adjacente;
+                        //pais.put(atual, pai); // Armazena o pai do vértice atual
+                        disponivel = true;
+                        break;
+                    }
+                }
+                // Se todos os vértices adjacentes já foram visitados, volte ao vértice pai
+                if (!disponivel) {
+                    atual = mapa.get(atual).pai();
                 }
             }
-            if (allVisited) {
-                pilha.pop();
-            }
-//            System.out.println(pilha);
         }
 
-        long fimDFS = System.currentTimeMillis();
+        long fimSeguidorDeParedeDireita = System.currentTimeMillis();
 
-        double tempoDFS = (fimDFS - inicioDFS);
+        double tempoSeguidorDeParedeDireita = (fimSeguidorDeParedeDireita - inicioSeguidorDeParedeDireita);
 
-        System.out.println("Tempo decorrido no Dfs: " + tempoDFS + " milissegundos ou " + tempoDFS/1000.0 + "segundos");
-
-//        System.out.println(mapa);
-
-        BFS bfs = new BFS();
-        long inicioBFS = System.currentTimeMillis();
-        List<Integer> caminho = bfs.buscar(mapa, inicio);
-        long fimBFS = System.currentTimeMillis();
-        double tempoBFS = (fimBFS - inicioBFS);
-
-        System.out.println("Tempo decorrido no BFS: " + tempoBFS + " milissegundos ou " + tempoBFS/1000.0 + "segundos");
-        System.out.println("Caminho mais curto: " + caminho);
+        System.out.println("Tempo decorrido no Seguidor de Parede: " + tempoSeguidorDeParedeDireita + " milissegundos ou " + tempoSeguidorDeParedeDireita/1000.0 + "segundos");
         System.out.println("Numero de chamadas da API: " + chamadas);
     }
 }
