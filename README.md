@@ -1,2 +1,2 @@
-# PI3B
-Repositório para controle de versão da matéria Projeto Integrador 3B
+# PI3B - Grupo D
+Repositório do Grupo D para controle de versão do Projeto Integrador 3B
